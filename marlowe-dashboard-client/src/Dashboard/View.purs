@@ -4,17 +4,17 @@ module Dashboard.View
   ) where
 
 import Prelude hiding (div)
-import Contract.Lenses (_followerAppId, _mMarloweParams, _metadata)
+import Contract.State (isContractClosed)
 import Contract.Types (State) as Contract
-import Contract.View (actionConfirmationCard, contractDetailsCard, contractInnerBox)
+import Contract.View (actionConfirmationCard, contractCard, contractScreen)
 import Css as Css
-import Dashboard.Lenses (_card, _cardOpen, _contractFilter, _contracts, _menuOpen, _remoteWalletInfo, _selectedContract, _templateState, _walletDetails, _walletIdInput, _walletLibrary, _walletNicknameInput)
-import Dashboard.State (partitionContracts)
-import Dashboard.Types (Action(..), Card(..), ContractFilter(..), PartitionedContracts, State)
-import Data.Array (length)
+import Dashboard.Lenses (_card, _cardOpen, _contractFilter, _contracts, _menuOpen, _remoteWalletInfo, _selectedContract, _selectedContractFollowerAppId, _templateState, _walletDetails, _walletIdInput, _walletLibrary, _walletNicknameInput)
+import Dashboard.Types (Action(..), Card(..), ContractFilter(..), State)
 import Data.Lens (preview, view, (^.))
+import Data.Map (Map, filter, isEmpty, lookup, toUnfoldable)
 import Data.Maybe (Maybe(..))
 import Data.String (take)
+import Data.Tuple.Nested ((/\))
 import Effect.Aff.Class (class MonadAff)
 import Halogen (ComponentHTML)
 import Halogen.Css (applyWhen, classNames)
@@ -23,7 +23,7 @@ import Halogen.HTML.Events.Extra (onClick_)
 import Halogen.HTML.Properties (href, id_, src)
 import Images (marloweRunNavLogo, marloweRunNavLogoDark)
 import MainFrame.Types (ChildSlots)
-import Marlowe.Extended (contractTypeInitials, contractTypeName)
+import Marlowe.PAB (PlutusAppId)
 import Marlowe.Semantics (PubKey, Slot)
 import Material.Icons (Icon(..)) as Icon
 import Material.Icons (icon, icon_)
@@ -38,15 +38,17 @@ import WalletData.View (currentWalletCard, saveWalletCard, walletDetailsCard, wa
 dashboardScreen :: forall m. MonadAff m => Slot -> State -> ComponentHTML Action ChildSlots m
 dashboardScreen currentSlot state =
   let
-    walletNickname = view (_walletDetails <<< _walletNickname) state
+    walletNickname = state ^. (_walletDetails <<< _walletNickname)
 
-    menuOpen = view _menuOpen state
+    menuOpen = state ^. _menuOpen
 
-    card = view _card state
+    card = state ^. _card
 
-    cardOpen = view _cardOpen state
+    cardOpen = state ^. _cardOpen
 
-    contractFilter = view _contractFilter state
+    contractFilter = state ^. _contractFilter
+
+    selectedContractFollowerAppId = state ^. _selectedContractFollowerAppId
 
     selectedContract = preview _selectedContract state
   in
@@ -61,9 +63,9 @@ dashboardScreen currentSlot state =
           , div [ classNames [ "h-full", "grid", "grid-rows-auto-1fr" ] ]
               [ dashboardBreadcrumb selectedContract
               , main
-                  [ classNames [ "relative" ] ] case selectedContract of
-                  Just contractState -> [ ContractAction <$> contractDetailsCard currentSlot contractState ]
-                  Nothing -> [ contractsScreen currentSlot state ]
+                  [ classNames [ "relative" ] ] case selectedContractFollowerAppId, selectedContract of
+                  Just followerAppId, Just contractState -> [ ContractAction followerAppId <$> contractScreen currentSlot contractState ]
+                  _, _ -> [ contractsScreen currentSlot state ]
               ]
           ]
       , dashboardFooter
@@ -87,7 +89,7 @@ dashboardCard currentSlot state = case view _card state of
 
       remoteWalletInfo = view _remoteWalletInfo state
 
-      selectedContract = preview _selectedContract state
+      contracts = view _contracts state
 
       templateState = view _templateState state
     in
@@ -108,8 +110,8 @@ dashboardCard currentSlot state = case view _card state of
                 SaveWalletCard mTokenName -> [ saveWalletCard walletLibrary walletNicknameInput walletIdInput remoteWalletInfo mTokenName ]
                 ViewWalletCard walletDetails -> [ walletDetailsCard walletDetails ]
                 ContractTemplateCard -> [ TemplateAction <$> contractTemplateCard walletLibrary assets templateState ]
-                ContractActionConfirmationCard action -> case selectedContract of
-                  Just contractState -> [ ContractAction <$> actionConfirmationCard assets contractState action ]
+                ContractActionConfirmationCard followerAppId action -> case lookup followerAppId contracts of
+                  Just contractState -> [ ContractAction followerAppId <$> actionConfirmationCard assets contractState action ]
                   Nothing -> []
         ]
   Nothing -> div_ []
@@ -245,10 +247,6 @@ link label url =
 contractsScreen :: forall m. MonadAff m => Slot -> State -> ComponentHTML Action ChildSlots m
 contractsScreen currentSlot state =
   let
-    -- TODO: This is going to be called every second, if we have a performance issue
-    -- see if we can use Lazy or to store the partition result in the state
-    contracts = partitionContracts $ view _contracts state
-
     contractFilter = view _contractFilter state
   in
     -- This convoluted combination of absolute and relative elements is the only way I could find
@@ -262,7 +260,7 @@ contractsScreen currentSlot state =
           [ classNames [ "absolute", "z-10", "inset-0", "h-full", "overflow-y-auto" ] ]
           [ div
               [ classNames $ Css.maxWidthContainer <> [ "relative", "h-full" ] ]
-              [ contractCards currentSlot state contracts ]
+              [ contractCards currentSlot state ]
           ]
       , div
           [ classNames [ "absolute", "inset-0" ] ]
@@ -315,14 +313,24 @@ contractNavigation contractFilter =
           ]
       ]
 
-contractCards :: forall p. Slot -> State -> PartitionedContracts -> HTML p Action
-contractCards currentSlot { contractFilter: Running } { running }
-  | length running == 0 = noContractsMessage Running
-  | otherwise = contractGrid currentSlot running
+contractCards :: forall p. Slot -> State -> HTML p Action
+contractCards currentSlot { contractFilter: Running, contracts } =
+  let
+    runningContracts = filter (not isContractClosed) contracts
+  in
+    if isEmpty runningContracts then
+      noContractsMessage Running
+    else
+      contractGrid currentSlot runningContracts
 
-contractCards currentSlot { contractFilter: Completed } { completed }
-  | length completed == 0 = noContractsMessage Completed
-  | otherwise = contractGrid currentSlot completed
+contractCards currentSlot { contractFilter: Completed, contracts } =
+  let
+    completedContracts = filter isContractClosed contracts
+  in
+    if isEmpty completedContracts then
+      noContractsMessage Running
+    else
+      contractGrid currentSlot completedContracts
 
 noContractsMessage :: forall p. ContractFilter -> HTML p Action
 noContractsMessage contractFilter =
@@ -349,41 +357,13 @@ noContractsMessage contractFilter =
               [ text "You have no completed contracts." ]
           ]
 
-contractGrid :: forall p. Slot -> Array Contract.State -> HTML p Action
+contractGrid :: forall p. Slot -> Map PlutusAppId Contract.State -> HTML p Action
 contractGrid currentSlot contracts =
   div
     [ classNames [ "grid", "pt-4", "pb-20", "lg:pb-4", "gap-4", "auto-rows-min", "md:grid-cols-2", "lg:grid-cols-3", "lg:px-16" ] ]
-    $ map (contractCard currentSlot) contracts
-
-contractCard :: forall p. Slot -> Contract.State -> HTML p Action
-contractCard currentSlot contractState =
-  let
-    mMarloweParams = contractState ^. _mMarloweParams
-
-    metadata = contractState ^. _metadata
-
-    contractInstanceId = contractState ^. _followerAppId
-
-    attributes = case mMarloweParams of
-      Just _ ->
-        -- NOTE: The overflow hidden helps fix a visual bug in which the background color eats away the border-radius
-        [ classNames [ "flex", "flex-col", "cursor-pointer", "shadow-sm", "hover:shadow", "active:shadow-lg", "bg-white", "rounded", "overflow-hidden" ]
-        , onClick_ $ SelectContract $ Just contractInstanceId
-        ]
-      -- in this case the box shouldn't be clickable
-      Nothing -> [ classNames [ "flex", "flex-col", "shadow-sm", "bg-white", "rounded", "overflow-hidden" ] ]
-  in
-    div
-      attributes
-      -- TODO: This part is really similar to contractTitle in Template.View, see if it makes sense to factor a component out
-      [ div
-          [ classNames [ "flex", "px-4", "pt-4", "items-center" ] ]
-          [ span [ classNames [ "text-2xl", "leading-none", "font-semibold" ] ] [ text $ contractTypeInitials metadata.contractType ]
-          , span [ classNames [ "flex-grow", "ml-2", "self-start", "text-xs", "uppercase" ] ] [ text $ contractTypeName metadata.contractType ]
-          , icon Icon.ArrowRight [ "text-28px" ]
-          ]
-      , ContractAction <$> contractInnerBox currentSlot contractState
-      ]
+    $ dashboardContractCard <$> toUnfoldable contracts
+  where
+  dashboardContractCard (followerAppId /\ contractState) = ContractAction followerAppId <$> contractCard currentSlot contractState
 
 -- FIXME: add a proper tutorials card (possibly a whole tutorials module)
 tutorialsCard :: forall p. HTML p Action
