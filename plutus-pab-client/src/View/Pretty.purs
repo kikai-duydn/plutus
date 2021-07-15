@@ -8,7 +8,7 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Map as Map
 import Data.Newtype (unwrap)
 import Halogen.HTML (HTML, b_, div_, span_, text)
-import Plutus.Contract.Effects (ActiveEndpoint, BalanceTxResponse(..), WriteBalancedTxResponse(..), PABReq(..), PABResp(..))
+import Plutus.Contract.Effects (ActiveEndpoint, BalanceTxResponse(..), WriteBalancedTxResponse(..), PABReq(..), PABResp(..), Waited(..))
 import Plutus.Contract.Resumable (Response(..))
 import Ledger.Constraints.OffChain (UnbalancedTx(..))
 import Plutus.V1.Ledger.Tx (Tx(..))
@@ -48,6 +48,9 @@ instance prettyResponse :: Pretty a => Pretty (Response a) where
       , text $ show $ unwrap rspItID
       , div_ [ pretty rspResponse ]
       ]
+
+instance prettyWaited :: Pretty a => Pretty (Waited a) where
+  pretty (Waited a) = pretty a
 
 instance prettyPABResp :: Pretty PABResp where
   pretty (AwaitSlotResp slot) =
