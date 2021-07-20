@@ -341,7 +341,7 @@ validator :: Future -> FutureAccounts -> Validator
 validator ft fos = Scripts.validatorScript (typedValidator ft fos)
 
 {-# INLINABLE verifyOracle #-}
-verifyOracle :: PlutusTx.IsData a => PubKey -> SignedMessage a -> Maybe (a, TxConstraints Void Void)
+verifyOracle :: PlutusTx.IsData a => PubKey -> SignedMessage a -> Maybe (a, TxConstraints i o)
 verifyOracle pubKey sm =
     either (const Nothing) pure
     $ Oracle.verifySignedMessageConstraints pubKey sm
@@ -353,7 +353,7 @@ verifyOracleOffChain Future{ftPriceOracle} sm =
         Right Observation{obsValue, obsTime} -> Just (obsTime, obsValue)
 
 {-# INLINABLE transition #-}
-transition :: Future -> FutureAccounts -> State FutureState -> FutureAction -> Maybe (TxConstraints Void Void, State FutureState)
+transition :: Future -> FutureAccounts -> State FutureState -> FutureAction -> Maybe (TxConstraints FutureAction FutureState, State FutureState)
 transition future@Future{ftDeliveryDate, ftPriceOracle} owners State{stateData=s, stateValue=currentValue} i =
     case (s, i) of
         (Running accounts, AdjustMargin role topUp) ->
@@ -403,7 +403,7 @@ data Payouts =
 payoutsTx
     :: Payouts
     -> FutureAccounts
-    -> TxConstraints Void Void
+    -> TxConstraints i o
 payoutsTx
     Payouts{payoutsShort, payoutsLong}
     FutureAccounts{ftoLongAccount, ftoShortAccount} =

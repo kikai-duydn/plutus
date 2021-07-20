@@ -119,7 +119,7 @@ type AuctionMachine = StateMachine AuctionState AuctionInput
 
 {-# INLINABLE auctionTransition #-}
 -- | The transitions of the auction state machine.
-auctionTransition :: AuctionParams -> State AuctionState -> AuctionInput -> Maybe (TxConstraints Void Void, State AuctionState)
+auctionTransition :: AuctionParams -> State AuctionState -> AuctionInput -> Maybe (TxConstraints AuctionInput AuctionState, State AuctionState)
 auctionTransition AuctionParams{apOwner, apAsset, apEndTime} State{stateData=oldState} input =
     case (oldState, input) of
 

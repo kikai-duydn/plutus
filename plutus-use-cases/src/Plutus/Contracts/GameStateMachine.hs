@@ -145,7 +145,7 @@ data GameInput =
     deriving anyclass (ToJSON, FromJSON)
 
 {-# INLINABLE transition #-}
-transition :: State GameState -> GameInput -> Maybe (TxConstraints Void Void, State GameState)
+transition :: State GameState -> GameInput -> Maybe (TxConstraints GameInput GameState, State GameState)
 transition State{stateData=oldData, stateValue=oldValue} input = case (oldData, input) of
     (Initialised mph tn s, MintToken) ->
         let constraints = Constraints.mustMintCurrency mph tn 1 in

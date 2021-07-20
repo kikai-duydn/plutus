@@ -190,7 +190,7 @@ valuePaid :: Payment -> TxInfo -> Bool
 valuePaid (Payment vl pk _) txinfo = vl == Validation.valuePaidTo txinfo pk
 
 {-# INLINABLE transition #-}
-transition :: Params -> State MSState -> Input -> Maybe (TxConstraints Void Void, State MSState)
+transition :: Params -> State MSState -> Input -> Maybe (TxConstraints Input MSState, State MSState)
 transition params State{ stateData =s, stateValue=currentValue} i = case (s, i) of
     (Holding, ProposePayment pmt)
         | isValidProposal currentValue pmt ->

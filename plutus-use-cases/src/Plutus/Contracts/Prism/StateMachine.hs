@@ -59,7 +59,7 @@ data UserCredential =
           deriving anyclass (ToJSON, FromJSON, Hashable)
 
 {-# INLINABLE transition #-}
-transition :: UserCredential -> State IDState -> IDAction -> Maybe (TxConstraints Void Void, State IDState)
+transition :: UserCredential -> State IDState -> IDAction -> Maybe (TxConstraints IDAction IDState, State IDState)
 transition UserCredential{ucAddress, ucCredential, ucToken} State{stateData=state, stateValue=currentValue} input =
     case (state, input) of
         (Active, PresentCredential) ->

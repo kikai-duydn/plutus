@@ -156,11 +156,11 @@ votingValue mph tokenName =
     Value.singleton (Value.mpsSymbol mph) tokenName 1
 
 {-# INLINABLE ownsVotingToken #-}
-ownsVotingToken :: MintingPolicyHash -> TokenName -> TxConstraints Void Void
+ownsVotingToken :: MintingPolicyHash -> TokenName -> TxConstraints i o
 ownsVotingToken mph tokenName = Constraints.mustSpendAtLeast (votingValue mph tokenName)
 
 {-# INLINABLE transition #-}
-transition :: Params -> State GovState -> GovInput -> Maybe (TxConstraints Void Void, State GovState)
+transition :: Params -> State GovState -> GovInput -> Maybe (TxConstraints GovInput GovState, State GovState)
 transition Params{..} State{ stateData = s, stateValue} i = case (s, i) of
 
     (GovState{mph}, MintTokens tokenNames) ->

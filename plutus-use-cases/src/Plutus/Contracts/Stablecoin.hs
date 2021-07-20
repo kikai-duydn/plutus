@@ -273,7 +273,7 @@ bankReservesValue Stablecoin{scBaseCurrency} BankState{bsReserves = BC i} =
     Value.assetClassValue scBaseCurrency i
 
 {-# INLINEABLE transition #-}
-transition :: Stablecoin -> State BankState -> Input -> Maybe (TxConstraints Void Void, State BankState)
+transition :: Stablecoin -> State BankState -> Input -> Maybe (TxConstraints Input BankState, State BankState)
 transition sc State{stateData=oldState} input =
     let toSmState state = State{stateData=state, stateValue=bankReservesValue sc state}
     in fmap (\(constraints, newState) -> (constraints, toSmState newState)) (step sc oldState input)

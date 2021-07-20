@@ -82,7 +82,7 @@ instance AsContractError PingPongError where
     _ContractError = _PingPongContractError
 
 {-# INLINABLE transition #-}
-transition :: State PingPongState -> Input -> Maybe (TxConstraints Void Void, State PingPongState)
+transition :: State PingPongState -> Input -> Maybe (TxConstraints Input PingPongState, State PingPongState)
 transition State{stateData=oldData,stateValue} input = case (oldData, input) of
     (_,      Stop) -> Just (mempty, State{stateData=Stopped, stateValue=mempty})
     (Pinged, Pong) -> Just (mempty, State{stateData=Ponged, stateValue})
