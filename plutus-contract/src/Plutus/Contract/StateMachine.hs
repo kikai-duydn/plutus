@@ -470,10 +470,12 @@ mkStep client@StateMachineClient{scInstance} input = do
                         $ Right
                         $ StateMachineTransition
                             { smtConstraints =
-                                (newConstraints <> unmint)
-                                    { txOwnInputs = inputConstraints
-                                    , txOwnOutputs = outputConstraints
-                                    }
+                                    newConstraints <> unmint
+                                    <> TxConstraints
+                                        { txConstraints = []
+                                        , txOwnInputs  = inputConstraints
+                                        , txOwnOutputs = outputConstraints
+                                        }
                             , smtOldState = oldState
                             , smtNewState = newState
                             , smtLookups = lookups

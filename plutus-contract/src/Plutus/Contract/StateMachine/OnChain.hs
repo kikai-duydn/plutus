@@ -51,7 +51,7 @@ data State s = State { stateData :: s, stateValue :: Value }
 -- of the transition in the context of the current transaction.
 data StateMachine s i = StateMachine {
       -- | The transition function of the state machine. 'Nothing' indicates an invalid transition from the current state.
-      smTransition  :: State s -> i -> Maybe (TxConstraints Void Void, State s),
+      smTransition  :: State s -> i -> Maybe (TxConstraints i s, State s),
 
       -- | Check whether a state is the final state
       smFinal       :: s -> Bool,
@@ -82,7 +82,7 @@ threadTokenValueOrZero StateMachineInstance{stateMachine,typedValidator} =
 --   'ScriptContext' (beyond enforcing the constraints)
 mkStateMachine
     :: Maybe TT.ThreadToken
-    -> (State s -> i -> Maybe (TxConstraints Void Void, State s))
+    -> (State s -> i -> Maybe (TxConstraints i s, State s))
     -> (s -> Bool)
     -> StateMachine s i
 mkStateMachine smThreadToken smTransition smFinal =
@@ -122,15 +122,12 @@ mkValidator (StateMachine step isFinal check threadToken) currentState input ptx
                     traceIfFalse "Non-zero value allocated in final state" (isZero newValue)
                     && traceIfFalse "State transition invalid - constraints not satisfied by ScriptContext" (checkScriptContext newConstraints ptx)
                 | otherwise ->
-                    let txc =
-                            newConstraints
-                                { txOwnOutputs=
-                                    [ OutputConstraint
-                                        { ocDatum = newData
-                                        , ocValue = newValue <> threadTokenValueInner threadToken (ownHash ptx)
-                                        }
-                                    ]
-                                }
+                    let txc = newConstraints
+                               <> TxConstraints
+                                    { txConstraints = []
+                                    , txOwnInputs =   []
+                                    , txOwnOutputs = [OutputConstraint{ocDatum = newData, ocValue = newValue}]
+                                    }
                     in traceIfFalse "State transition invalid - constraints not satisfied by ScriptContext" (checkScriptContext @_ @s txc ptx)
             Nothing -> trace "State transition invalid - input is not a valid transition at the current state" False
     in checkOk && stateAndOutputsOk
